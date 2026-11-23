@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "Tarea U2 · Coworking",
+    "description": "Flujo integrado PostgreSQL + MongoDB para el caso 9. Ejecutar en orden contra la instancia local; crea datos de prueba y limpia incidencia, reserva y espacio al final.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "" },
+    { "key": "password", "value": "CoworkingU2!2026" },
+    { "key": "token", "value": "" },
+    { "key": "suffix", "value": "" },
+    { "key": "spaceId", "value": "" },
+    { "key": "reservationId", "value": "" },
+    { "key": "issueId", "value": "" },
+    { "key": "startAt", "value": "" },
+    { "key": "endAt", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 · Registrar usuario de ejecución",
+      "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+        "const suffix = String(Date.now()).slice(-4);",
+        "pm.collectionVariables.set('suffix', suffix);",
+        "pm.collectionVariables.set('email', `coworking-${Date.now()}@example.test`);",
+        "pm.collectionVariables.set('startAt', new Date(Date.now() + 86400000).toISOString());",
+        "pm.collectionVariables.set('endAt', new Date(Date.now() + 90000000).toISOString());"
+      ] } }, { "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Registro devuelve 201', () => pm.response.to.have.status(201));",
+        "pm.test('Registro confirma creación', () => pm.expect(pm.response.json().message).to.include('registered'));"
+      ] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Usuario Coworking\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }, "url": "{{baseUrl}}/api/auth/register" }
+    },
+    {
+      "name": "02 · Iniciar sesión",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Login devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Login entrega JWT', () => pm.expect(pm.response.json().token).to.be.a('string').and.not.empty);",
+        "pm.collectionVariables.set('token', pm.response.json().token);"
+      ] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }, "url": "{{baseUrl}}/api/auth/login" }
+    },
+    {
+      "name": "03 · Crear espacio de prueba",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Espacio creado con 201', () => pm.response.to.have.status(201));",
+        "pm.test('Espacio incluye virtual summary', () => pm.expect(pm.response.json().summary).to.be.a('string'));",
+        "pm.collectionVariables.set('spaceId', pm.response.json()._id);"
+      ] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sala Coworking {{suffix}}\",\n  \"code\": \"COW-{{suffix}}\",\n  \"capacity\": 6,\n  \"equipment\": [\"monitor\", \"pizarra\"],\n  \"kind\": \"sala\"\n}" }, "url": "{{baseUrl}}/api/espacios" }
+    },
+    {
+      "name": "04 · Buscar catálogo",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Búsqueda devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Búsqueda encuentra el espacio', () => pm.expect(pm.response.json().some(x => x._id === pm.collectionVariables.get('spaceId'))).to.eql(true));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/espacios?q={{suffix}}&fields=name,code,capacity,equipment,kind,status,slug" }
+    },
+    {
+      "name": "05 · Consultar ID inválido",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('ID inválido devuelve 400', () => pm.response.to.have.status(400));"] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/espacios/no-es-un-objectid" }
+    },
+    {
+      "name": "06 · Consultar disponibilidad",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Disponibilidad devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Espacio está disponible', () => pm.expect(pm.response.json().some(x => x._id === pm.collectionVariables.get('spaceId'))).to.eql(true));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/espacios/disponibles?inicio={{startAt}}&fin={{endAt}}&capacidad=4" }
+    },
+    {
+      "name": "07 · Crear reserva",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Reserva creada con 201', () => pm.response.to.have.status(201));",
+        "pm.test('Reserva guarda el espacio', () => pm.expect(pm.response.json().spaceId).to.eql(pm.collectionVariables.get('spaceId')));",
+        "pm.collectionVariables.set('reservationId', pm.response.json().id);"
+      ] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }], "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{spaceId}}\",\n  \"startAt\": \"{{startAt}}\",\n  \"endAt\": \"{{endAt}}\"\n}" }, "url": "{{baseUrl}}/api/reservas" }
+    },
+    {
+      "name": "08 · Rechazar horario solapado",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Choque de horario devuelve 409', () => pm.response.to.have.status(409));"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }], "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{spaceId}}\",\n  \"startAt\": \"{{startAt}}\",\n  \"endAt\": \"{{endAt}}\"\n}" }, "url": "{{baseUrl}}/api/reservas" }
+    },
+    {
+      "name": "09 · Listar mis reservas",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Mis reservas devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Respuesta une el catálogo', () => pm.expect(pm.response.json().some(x => x.space && x.space._id === pm.collectionVariables.get('spaceId'))).to.eql(true));"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/reservas/mias" }
+    },
+    {
+      "name": "10 · Reportar incidencia",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Incidencia creada con 201', () => pm.response.to.have.status(201));",
+        "pm.test('Incidencia copia el userId', () => pm.expect(pm.response.json().userId).to.be.a('number'));",
+        "pm.collectionVariables.set('issueId', pm.response.json()._id);"
+      ] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }], "body": { "mode": "raw", "raw": "{\n  \"reservationId\": {{reservationId}},\n  \"description\": \"El monitor de la sala no enciende correctamente\",\n  \"category\": \"equipo\"\n}" }, "url": "{{baseUrl}}/api/incidencias" }
+    },
+    {
+      "name": "11 · Rechazar incidencia duplicada",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Incidencia duplicada devuelve 409', () => pm.response.to.have.status(409));"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }], "body": { "mode": "raw", "raw": "{\n  \"reservationId\": {{reservationId}},\n  \"description\": \"El monitor de la sala sigue sin encender\",\n  \"category\": \"equipo\"\n}" }, "url": "{{baseUrl}}/api/incidencias" }
+    },
+    {
+      "name": "12 · Listar incidencias con resumen",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Incidencias devuelven 200', () => pm.response.to.have.status(200));",
+        "pm.test('Incluye aggregate y populate', () => { const data = pm.response.json(); pm.expect(data.counts).to.be.an('array'); pm.expect(data.rows.some(x => x.espacioId && x.espacioId.name)).to.eql(true); });"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/incidencias" }
+    },
+    {
+      "name": "13 · Limpiar incidencia de prueba",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Incidencia eliminada', () => pm.response.to.have.status(204));"] } }],
+      "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/incidencias/{{issueId}}" }
+    },
+    {
+      "name": "14 · Cancelar reserva de prueba",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reserva eliminada', () => pm.response.to.have.status(204));"] } }],
+      "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/reservas/{{reservationId}}" }
+    },
+    {
+      "name": "15 · Limpiar espacio de prueba",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Espacio eliminado', () => pm.response.to.have.status(204));"] } }],
+      "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/espacios/{{spaceId}}" }
+    },
+    {
+      "name": "16 · Eliminar usuario temporal",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Usuario temporal eliminado', () => pm.response.to.have.status(204));"] } }],
+      "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/auth/me" }
+    }
+  ]
+}

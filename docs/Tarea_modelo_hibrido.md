@@ -1,6 +1,6 @@
 # Tarea individual U2 · Coworking
 
-**Estudiante:** ____________________ · **N.º de lista:** 9 · **Caso:** 9 · Coworking
+**Estudiante:** Jardel Maza · **N.º de lista:** 9 · **Caso:** 9 · Coworking
 
 ## 1. Workload
 

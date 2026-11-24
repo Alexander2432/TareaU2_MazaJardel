@@ -98,12 +98,11 @@ erDiagram
     String status
     DateTime createdAt
   }
-  SPACE ||--o{ ISSUE : "espacioId en Mongo"
+  SPACE ||--o{ ISSUE : "spaceId en Mongo"
   RESERVATION }o..|| SPACE : "referencia entre bases"
   RESERVATION ||..o| ISSUE : "reservationId entre bases"
 ```
 
-La vista siguiente resalta las dos zonas y las referencias entre motores con flechas punteadas:
 
 ```mermaid
 flowchart LR
@@ -114,7 +113,7 @@ flowchart LR
   end
   subgraph MG[MongoDB]
     S["Space<br/>_id PK · name · capacity<br/>equipment (lista) · kind · status"]
-    I["Issue<br/>_id PK · reservationId único<br/>espacioId ObjectId ref · userId<br/>description · status · createdAt"]
+    I["Issue<br/>_id PK · reservationId único<br/>spaceId ObjectId ref · userId<br/>description · status · createdAt"]
     S -- "1 a muchos" --> I
   end
   R -. "spaceId → _id" .-> S
